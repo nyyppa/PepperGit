@@ -1,0 +1,11 @@
+topic: ~introduction()
+# Defining extra concepts out of words or group of words
+concept:(hello) [hello hi hey "good morning" greetings]
+concept:(good) [fine good "doing fine" "doing good"]
+concept:(bad) [bad tired sad "feeling down"]
+# Replying to speech
+u:(~hello) how are you?
+    u1:(~good) thats good to hear!
+    u1:(~bad) aww, thats sad. did something happen?
+        u2:(yes) what happened?
+        u2:(no) im sure you will feel better soon!

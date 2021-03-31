@@ -1,0 +1,7 @@
+topic: ~food()
+# Defining extra concepts out of words or group of words
+#concept:(hello) [hello hi hey "good morning" greetings]
+concept:(food) [food]
+concept:(inqridient) [fish meat wheat cappage]
+# Replying to speech
+u:(~food) ~inqridient
