@@ -2,6 +2,7 @@ package com.example.myapplication;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.Button;
 
 import com.aldebaran.qi.Future;
 import com.aldebaran.qi.sdk.QiContext;
@@ -25,6 +26,14 @@ import com.aldebaran.qi.sdk.object.conversation.PhraseSet;
 import com.aldebaran.qi.sdk.object.conversation.QiChatbot;
 import com.aldebaran.qi.sdk.object.conversation.Say;
 import com.aldebaran.qi.sdk.object.conversation.Topic;
+import com.aldebaran.qi.sdk.object.human.AttentionState;
+import com.aldebaran.qi.sdk.object.human.EngagementIntentionState;
+import com.aldebaran.qi.sdk.object.human.ExcitementState;
+import com.aldebaran.qi.sdk.object.human.Gender;
+import com.aldebaran.qi.sdk.object.human.Human;
+import com.aldebaran.qi.sdk.object.human.PleasureState;
+import com.aldebaran.qi.sdk.object.human.SmileState;
+import com.aldebaran.qi.sdk.object.humanawareness.HumanAwareness;
 import com.aldebaran.qi.sdk.object.locale.Language;
 import com.aldebaran.qi.sdk.object.locale.Locale;
 import com.aldebaran.qi.sdk.object.locale.Region;
@@ -35,6 +44,14 @@ import java.util.List;
 
 public class MainActivity extends RobotActivity implements RobotLifecycleCallbacks {
     private Chat chat;
+
+
+    // Store the HumanAwareness service.
+    private HumanAwareness humanAwareness;
+    // The QiContext provided by the QiSDK.
+    private QiContext qiContext;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -51,21 +68,22 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
 
     @Override
     public void onRobotFocusGained(QiContext qiContext) {
-        
+        followHuman(qiContext);
         //Topic topic = TopicBuilder.with(qiContext).withResource(R.raw.esimerkki).build(); //Gets topic file for chatbot to use
-
         List<Topic>topics=new ArrayList<>();
         //Create list to hold topics
-        topics.add(TopicBuilder.with(qiContext).withResource(R.raw.esimerkki).build());
+        /*topics.add(TopicBuilder.with(qiContext).withResource(R.raw.esimerkki).build());
         //add topic to the list
         topics.add(TopicBuilder.with(qiContext).withResource(R.raw.food).build());
         //add topic to the list
-        topics.add(TopicBuilder.with(qiContext).withResource(R.raw.introduction).build());
+        topics.add(TopicBuilder.with(qiContext).withResource(R.raw.introduction).build());*/
+       /*
+        topics.add(TopicBuilder.with(qiContext).withResource(R.raw.keskustelu).build());
         //add topic to the list
         QiChatbot qiChatbot = QiChatbotBuilder.with(qiContext).withTopics(topics).build();
         //Creates QiChatbot for Chat to use
-        
-        chat = ChatBuilder.with(qiContext).withChatbot(qiChatbot).build(); //Creates chat using the chatbot and gives it languege to speak
+        Locale locale=new Locale(Language.FINNISH,Region.FINLAND);
+        chat = ChatBuilder.with(qiContext).withChatbot(qiChatbot).withLocale(locale).build(); //Creates chat using the chatbot and gives it languege to speak
         chat.addOnStartedListener(() -> Log.i("Testi", "Discussion started.")); //adds listener for when chat is started and prints to log when it's going.
         Future<Void> chatFuture = chat.async().run(); //Starts the chat asyncronically
         //prints if chat has error starting
@@ -74,7 +92,7 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
                 Log.e("Error", "Discussion finished with error.", future.getError());
             }
         });
-
+        */
         // The robot focus is gained.
         // Create a new say action.
         /*
@@ -99,14 +117,14 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
         if(phraseSet.getPhrases().contains(listenResult.getHeardPhrase())){
             SayBuilder.with(qiContext).withText("how are you?").build().run();
         }*/
-
+        /*
         Animation animation= AnimationBuilder.with(qiContext).withResources(R.raw.animation_00).build();
         //builds Animation
         Animate animate = AnimateBuilder.with(qiContext).withAnimation(animation).build();
         //builds runnable animation
         animate.run();
         //starts the animation
-
+        */
         /*qiChatbot.addOnFocusedTopicChangedListener(new QiChatbot.OnFocusedTopicChangedListener() {
             @Override
             public void onFocusedTopicChanged(Topic topic) {
@@ -127,10 +145,79 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
         if(chat!=null){
             chat.removeAllOnStartedListeners();
         }
+        this.qiContext = null;
     }
 
     @Override
     public void onRobotFocusRefused(String reason) {
         // The robot focus is refused.
     }
+
+    private void followHuman(QiContext qiContext){
+        this.qiContext=qiContext;
+        humanAwareness = qiContext.getHumanAwareness();
+        findHumansAround();
+        /*Button refreshButton = (Button) findViewById(R.id.refresh_button);
+        refreshButton.setOnClickListener(v -> {
+            if (qiContext != null) {
+                findHumansAround();
+            }
+        });*/
+        PhraseSet phraseSet = PhraseSetBuilder.with(qiContext)
+                .withTexts("Ihmiset")
+                .build();
+        Listen listen=ListenBuilder.with(qiContext).withLocale(new Locale(Language.FINNISH,Region.FINLAND)).withPhraseSet(
+                phraseSet
+        ).build();
+        ListenResult listenResult=listen.run();
+        if(listenResult.getHeardPhrase().getText().equals("Ihmiset")){
+            followHuman(qiContext);
+        }
+        Log.i("TAG", "Heard phrase: " + listenResult.getHeardPhrase().getText());
+
+    }
+
+
+    private void findHumansAround() {
+        Future<List<Human>> humansAroundFuture=humanAwareness.async().getHumansAround();
+        humansAroundFuture.andThenConsume(humansAround -> {
+            Log.i("ihmisii", humansAround.size() + " human(s) around.");
+            retrieveCharacteristics(humansAround);
+        });
+    }
+
+
+    private void retrieveCharacteristics(final List<Human> humans) {
+
+        String TAG="ihmis tietoo";
+        for (int i = 0; i < humans.size(); i++) {
+            // Get the human.
+            Human human = humans.get(i);
+
+            // Get the characteristics.
+            Integer age = human.getEstimatedAge().getYears();
+            Gender gender = human.getEstimatedGender();
+            PleasureState pleasureState = human.getEmotion().getPleasure();
+            ExcitementState excitementState = human.getEmotion().getExcitement();
+            EngagementIntentionState engagementIntentionState = human.getEngagementIntention();
+            SmileState smileState = human.getFacialExpressions().getSmile();
+            AttentionState attentionState = human.getAttention();
+
+            // Display the characteristics.
+            Log.i(TAG, "----- Human " + i + " -----");
+            Log.i(TAG, "Age: " + age + " year(s)");
+            Log.i(TAG, "Gender: " + gender);
+            Log.i(TAG, "Pleasure state: " + pleasureState);
+            Log.i(TAG, "Excitement state: " + excitementState);
+            Log.i(TAG, "Engagement state: " + engagementIntentionState);
+            Log.i(TAG, "Smile state: " + smileState);
+            Log.i(TAG, "Attention state: " + attentionState);
+        }
+
+
+    }
+
+
+
+
 }

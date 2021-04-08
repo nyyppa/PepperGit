@@ -1,0 +1,12 @@
+topic: ~keskustelu()
+# Defining extra concepts out of words or group of words
+#concept:(hello) [hello hi hey "good morning" greetings]
+
+# Replying to speech
+#u:(~hello) ~hello
+concept:(hello) [hei moi moro heippa tere Hi]
+concept:(good) [hyvin "ei valittamista" "ihan hyvin"]
+concept:(bad) [huonosti ikävästi]
+u:(~hello) ["Miten menee"]
+u1:(~good) ["loistavaa kuulla"]
+u1:(~bad) ["Sepä ikävää"]
