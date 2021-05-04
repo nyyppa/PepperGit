@@ -19,13 +19,19 @@
         tools:context=".MainActivity">
 
 
-        <androidx.appcompat.widget.AppCompatImageView
-            android:layout_width="340dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:padding="00dp"
-            app:srcCompat="@drawable/sbrlogo" />
+        <ImageView
+            android:id="@+id/picture_view"
+            android:layout_width="300dp"
+            android:layout_height="300dp"
+            android:layout_above="@+id/take_pic_button"
+            android:layout_centerInParent="true"  />
 
+        <Button
+            android:id="@+id/take_pic_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:text="Take a picture"/>
 
     </LinearLayout>
 

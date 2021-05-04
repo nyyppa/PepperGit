@@ -3,6 +3,7 @@ package com.example.myapplication;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.util.Base64;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -17,6 +18,7 @@ import com.aldebaran.qi.sdk.builder.ChatBuilder;
 import com.aldebaran.qi.sdk.builder.GoToBuilder;
 import com.aldebaran.qi.sdk.builder.ListenBuilder;
 import com.aldebaran.qi.sdk.builder.LocalizeAndMapBuilder;
+import com.aldebaran.qi.sdk.builder.LocalizeBuilder;
 import com.aldebaran.qi.sdk.builder.PhraseSetBuilder;
 import com.aldebaran.qi.sdk.builder.QiChatbotBuilder;
 import com.aldebaran.qi.sdk.builder.SayBuilder;
@@ -27,10 +29,14 @@ import com.aldebaran.qi.sdk.design.activity.RobotActivity;
 import com.aldebaran.qi.sdk.object.actuation.Actuation;
 import com.aldebaran.qi.sdk.object.actuation.Animate;
 import com.aldebaran.qi.sdk.object.actuation.Animation;
+import com.aldebaran.qi.sdk.object.actuation.ExplorationMap;
 import com.aldebaran.qi.sdk.object.actuation.Frame;
 import com.aldebaran.qi.sdk.object.actuation.FreeFrame;
 import com.aldebaran.qi.sdk.object.actuation.GoTo;
+import com.aldebaran.qi.sdk.object.actuation.LocalizationStatus;
+import com.aldebaran.qi.sdk.object.actuation.Localize;
 import com.aldebaran.qi.sdk.object.actuation.LocalizeAndMap;
+import com.aldebaran.qi.sdk.object.actuation.MapTopGraphicalRepresentation;
 import com.aldebaran.qi.sdk.object.actuation.Mapping;
 import com.aldebaran.qi.sdk.object.camera.TakePicture;
 import com.aldebaran.qi.sdk.object.conversation.Chat;
@@ -55,6 +61,7 @@ import com.aldebaran.qi.sdk.object.image.TimestampedImageHandle;
 import com.aldebaran.qi.sdk.object.locale.Language;
 import com.aldebaran.qi.sdk.object.locale.Locale;
 import com.aldebaran.qi.sdk.object.locale.Region;
+import com.aldebaran.qi.sdk.object.streamablebuffer.StreamableBuffer;
 import com.softbankrobotics.dx.followme.FollowHuman;
 
 import java.nio.ByteBuffer;
@@ -101,6 +108,8 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
     @Override
     public void onRobotFocusGained(QiContext qiContext) {
         this.qiContext = qiContext;
+        pepperMapping(qiContext);
+        //pepperTakePicture();
         //makingPepperGoTo(qiContext);
         //followHuman(qiContext);
         //Topic topic = TopicBuilder.with(qiContext).withResource(R.raw.esimerkki).build(); //Gets topic file for chatbot to use
@@ -190,15 +199,17 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
     public void onRobotFocusRefused(String reason) {
         // The robot focus is refused.
     }
-    /*
+
+
+
     private void pepperTakePicture(){
         Future<TakePicture> takePictureFuture = TakePictureBuilder.with(qiContext).buildAsync();
         // Find the button and the imageView in the onCreate method
-        Button TakePicButton = (Button) findViewById(R.id.take_pic_button);
+        button= (Button) findViewById(R.id.take_pic_button);
         pictureView = findViewById(R.id.picture_view);
 
         // Set the button onClick listener.
-        TakePicButton.setOnClickListener(v -> takePicture(takePictureFuture));
+        button.setOnClickListener(v -> takePicture(takePictureFuture));
     }
     public void takePicture(Future<TakePicture> takePictureFuture) {
         String TAG="kuva";
@@ -235,10 +246,46 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
             runOnUiThread(() -> pictureView.setImageBitmap(pictureBitmap));
         });
     }
-*/
+
+
+    private void testi(LocalizeAndMap localizeAndMap,QiContext qiContext){
+        ExplorationMap explorationMap = localizeAndMap.dumpMap();
+        Localize localize = LocalizeBuilder.with(qiContext)
+                .withMap(explorationMap)
+                .build();
+        localize.addOnStatusChangedListener(localizationStatus -> {
+            if (localizationStatus == LocalizationStatus.LOCALIZED) {
+                /* robot is ready! */
+            }
+        });
+        StreamableBuffer streamableBuffer = explorationMap.serializeAsStreamableBuffer();
+        MapTopGraphicalRepresentation mapGraphicalRepresentation =
+                explorationMap.getTopGraphicalRepresentation();
+        EncodedImage encodedImage = mapGraphicalRepresentation.getImage();
+        pictureView = findViewById(R.id.picture_view);
+        byte[] decodedString = Base64.decode(encodedImage.getData().array(), Base64.DEFAULT);
+        Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+        pictureView.setImageBitmap(decodedByte);
+
+    }
+
+    private Future<Void> localizationAndMapping;
     private void pepperMapping(QiContext qiContext){
+// Build the action.
         LocalizeAndMap localizeAndMap = LocalizeAndMapBuilder.with(qiContext).build();
-        Future localizingAndMapping = localizeAndMap.async().run();
+// Add a listener to get the map when localized.
+        localizeAndMap.addOnStatusChangedListener(localizationStatus -> {
+            if (localizationStatus == LocalizationStatus.LOCALIZED) {
+                // Stop the action.
+                localizationAndMapping.requestCancellation();
+                // Dump the map for future use by a Localize action.
+                ExplorationMap explorationMap = localizeAndMap.dumpMap();
+                Log.i("heii",explorationMap.serialize());
+            }
+        });
+
+// Run the action.
+        localizationAndMapping = localizeAndMap.async().run();
 
     }
 
