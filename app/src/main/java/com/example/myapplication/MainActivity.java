@@ -2,11 +2,17 @@ package com.example.myapplication;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
+import android.widget.Spinner;
 
 import com.aldebaran.qi.Future;
 import com.aldebaran.qi.sdk.QiContext;
@@ -47,6 +53,7 @@ import com.aldebaran.qi.sdk.object.conversation.QiChatbot;
 import com.aldebaran.qi.sdk.object.conversation.Say;
 import com.aldebaran.qi.sdk.object.conversation.Topic;
 import com.aldebaran.qi.sdk.object.geometry.Transform;
+import com.aldebaran.qi.sdk.object.geometry.TransformTime;
 import com.aldebaran.qi.sdk.object.human.AttentionState;
 import com.aldebaran.qi.sdk.object.human.EngagementIntentionState;
 import com.aldebaran.qi.sdk.object.human.ExcitementState;
@@ -66,15 +73,14 @@ import com.softbankrobotics.dx.followme.FollowHuman;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class MainActivity extends RobotActivity implements RobotLifecycleCallbacks {
     private Chat chat;
 
-
-    // Store the GoTo action.
-    private GoTo goTo;
 
 
     // Store the HumanAwareness service.
@@ -90,12 +96,35 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
     private Future<TimestampedImageHandle> timestampedImageHandleFuture;
 
 
+
+    // Store the saved locations.
+    private Map<String, FreeFrame> savedLocations = new HashMap<>();
+    // Store the Actuation service.
+    private Actuation actuation;
+    // Store the Mapping service.
+    private Mapping mapping;
+    // Store the GoTo action.
+    private GoTo goTo;
+
+
+    private Button gotoButton;
+    private Button saveButton;
+    private ArrayAdapter<String> spinnerAdapter;
+
+    // Store the selected location.
+    private String selectedLocation;
+
+
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.movement);
         // Register the RobotLifecycleCallbacks to this Activity.
         QiSDK.register(this, this);
+        addToOnCreate();
     }
  //1232
     @Override
@@ -108,7 +137,8 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
     @Override
     public void onRobotFocusGained(QiContext qiContext) {
         this.qiContext = qiContext;
-        pepperMapping(qiContext);
+        masteringFreeFrame(qiContext);
+        //pepperMapping(qiContext);
         //pepperTakePicture();
         //makingPepperGoTo(qiContext);
         //followHuman(qiContext);
@@ -271,6 +301,7 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
 
     private Future<Void> localizationAndMapping;
     private void pepperMapping(QiContext qiContext){
+        pictureView = findViewById(R.id.picture_view);
 // Build the action.
         LocalizeAndMap localizeAndMap = LocalizeAndMapBuilder.with(qiContext).build();
 // Add a listener to get the map when localized.
@@ -281,6 +312,20 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
                 // Dump the map for future use by a Localize action.
                 ExplorationMap explorationMap = localizeAndMap.dumpMap();
                 Log.i("heii",explorationMap.serialize());
+                StreamableBuffer streamableBuffer = explorationMap.serializeAsStreamableBuffer();
+                MapTopGraphicalRepresentation mapGraphicalRepresentation =
+                        explorationMap.getTopGraphicalRepresentation();
+                EncodedImage encodedImage = mapGraphicalRepresentation.getImage();
+
+                byte[] decodedString = Base64.decode(encodedImage.getData().array(), Base64.DEFAULT);
+                Log.i("heii", pictureView.toString());
+                Bitmap decodedByte = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
+                runOnUiThread(()->pictureView.setImageBitmap(decodedByte));
+                button= (Button) findViewById(R.id.take_pic_button);
+                button.setBackground(getDrawable(R.drawable.sbrlogo));
+                
+
+
             }
         });
 
@@ -288,6 +333,126 @@ public class MainActivity extends RobotActivity implements RobotLifecycleCallbac
         localizationAndMapping = localizeAndMap.async().run();
 
     }
+
+
+
+    private void waitForInstructions() {
+        Log.i("liike", "Waiting for instructions...");
+        runOnUiThread(() -> {
+            saveButton.setEnabled(true);
+            gotoButton.setEnabled(true);
+        });
+    }
+
+
+
+    private void addToOnCreate(){
+
+        final String TAG= "liike";
+        final EditText addItemEdit = (EditText) findViewById(R.id.add_item_edit);
+        final Spinner spinner = (Spinner) findViewById(R.id.spinner);
+
+// Save location on save button clicked.
+        saveButton = (Button) findViewById(R.id.save_button);
+        saveButton.setOnClickListener(v -> {
+            String location = addItemEdit.getText().toString();
+            addItemEdit.setText("");
+            // Save location only if new.
+            if (!location.isEmpty() && !savedLocations.containsKey(location)) {
+                spinnerAdapter.add(location);
+                saveLocation(location);
+            }
+        });
+
+// Go to location on go to button clicked.
+        gotoButton = (Button) findViewById(R.id.goto_button);
+        gotoButton.setOnClickListener(v -> {
+            if (selectedLocation != null) {
+                gotoButton.setEnabled(false);
+                saveButton.setEnabled(false);
+                goToLocation(selectedLocation);
+            }
+        });
+
+// Store location on selection.
+        spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                selectedLocation = (String) parent.getItemAtPosition(position);
+                Log.i(TAG, "onItemSelected: " + selectedLocation);
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                selectedLocation = null;
+                Log.i(TAG, "onNothingSelected");
+            }
+        });
+
+// Setup spinner adapter.
+        spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new ArrayList<String>());
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(spinnerAdapter);
+
+
+    }
+
+    private void masteringFreeFrame(QiContext qiContext){
+// Store the provided QiContext and services.
+        this.qiContext = qiContext;
+        actuation = qiContext.getActuation();
+        mapping = qiContext.getMapping();
+        waitForInstructions();
+    }
+
+
+    void saveLocation(final String location) {
+        // Get the robot frame asynchronously.
+        Future<Frame> robotFrameFuture = actuation.async().robotFrame();
+        robotFrameFuture.andThenConsume(robotFrame -> {
+            // Create a FreeFrame representing the current robot frame.
+            FreeFrame locationFrame = mapping.makeFreeFrame();
+            Transform transform = TransformBuilder.create().fromXTranslation(0);
+            locationFrame.update(robotFrame, transform, 0L);
+
+            // Store the FreeFrame.
+            savedLocations.put(location, locationFrame);
+        });
+    }
+
+
+
+    void goToLocation(final String location) {
+        String TAG="liike";
+        // Get the FreeFrame from the saved locations.
+        FreeFrame freeFrame = savedLocations.get(location);
+
+        // Extract the Frame asynchronously.
+        Future<Frame> frameFuture = freeFrame.async().frame();
+        frameFuture.andThenCompose(frame -> {
+            // Create a GoTo action.
+            goTo = GoToBuilder.with(qiContext)
+                    .withFrame(frame)
+                    .build();
+
+            // Display text when the GoTo action starts.
+            goTo.addOnStartedListener(() -> Log.i(TAG, "Moving..."));
+
+            // Execute the GoTo action asynchronously.
+            return goTo.async().run();
+        }).thenConsume(future -> {
+            if (future.isSuccess()) {
+                Log.i(TAG, "Location reached: " + location);
+            } else if (future.hasError()) {
+                Log.e(TAG, "Go to location error", future.getError());
+            }
+        });
+
+    }
+
+
+
+
 
     private void followHuman(QiContext qiContext){
         this.qiContext=qiContext;
